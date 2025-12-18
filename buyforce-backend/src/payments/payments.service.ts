@@ -98,22 +98,17 @@ async checkAndCloseGroup(groupId: number) {
 
   if (!group) throw new Error('Group not found');
 
- const paidUserIds = new Set(
-  group.payments
-    .filter(p => p.status === 'CAPTURED')
-    .map(p => p.userId)
-);
+  const paidUserIds = new Set(group.payments.map(p => p.userId));
 
-if (paidUserIds.size === group.members.length) {
-  await this.prisma.group.update({
-    where: { id: group.id },
-    data: {
-      status: 'paid',
-      paidAt: new Date(),
-    },
-  });
-}
-
+  if (paidUserIds.size === group.members.length) {
+    await this.prisma.group.update({
+      where: { id: group.id },
+      data: {
+        status: 'paid',
+        paidAt: new Date(),
+      },
+    });
+  }
 }
 }
 
