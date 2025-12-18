@@ -8,6 +8,7 @@ import { ProductsModule } from './products/products.module';
 import { GroupsModule } from './groups/groups.module';
 import { AdminModule } from './admin/admin.module';
 import { PaymentsModule } from './payments/payments.module';
+
 @Module({
   
   imports: [PrismaModule, AuthModule, CategoriesModule, ProductsModule, 
