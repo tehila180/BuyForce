@@ -84,28 +84,31 @@ async createPayPalOrder(userId: string, groupId: number) {
 
 
 
- async checkAndCloseGroup(groupId: number) {
+async checkAndCloseGroup(groupId: number) {
   const group = await this.prisma.group.findUnique({
     where: { id: groupId },
     include: {
       members: true,
-      payments: true,
+      payments: {
+        where: { status: 'CAPTURED' },
+        select: { userId: true },
+      },
     },
   });
 
-  if (!group) return;
+  if (!group) throw new Error('Group not found');
 
-  const paidUserIds = new Set(
-  group.payments
-    .filter(p => p.status === 'CAPTURED')
-    .map(p => p.userId)
-);
+  const paidUserIds = new Set(group.payments.map(p => p.userId));
 
-if (paidUserIds.size === group.members.length) {
-  await this.prisma.group.update({
-    where: { id: group.id },
-    data: { status: 'paid', paidAt: new Date() },
-  });
+  if (paidUserIds.size === group.members.length) {
+    await this.prisma.group.update({
+      where: { id: group.id },
+      data: {
+        status: 'paid',
+        paidAt: new Date(),
+      },
+    });
+  }
 }
- }}
+}
 
