@@ -1,21 +1,20 @@
-import {  Body,Controller, Post, Get, Req, Query, UseGuards } from '@nestjs/common';
+// src/payments/payments.controller.ts
+import { Controller, Post, Get, Body, Query, Req, UseGuards } from '@nestjs/common';
 import { PaymentsService } from './payments.service';
-import { JwtAuthGuard } from '../auth/jwt.guard';
+import { AuthGuard } from '@nestjs/passport';
 
 @Controller('payments/paypal')
+@UseGuards(AuthGuard('jwt'))
 export class PaymentsController {
-  constructor(private service: PaymentsService) {}
+  constructor(private payments: PaymentsService) {}
 
-  @UseGuards(JwtAuthGuard)
- @Post('paypal/create')
-@UseGuards(JwtAuthGuard)
-create(@Req() req, @Body('groupId') groupId: number) {
-  return this.service.createPayPalOrder(req.user.id, groupId);
-}
+  @Post('create')
+  create(@Req() req: any, @Body('groupId') groupId: number) {
+    return this.payments.createPayPalOrder(req.user.id, Number(groupId));
+  }
 
-@Get('paypal/capture')
-async capture(@Query('token') token: string) {
-  return this.service.capturePayPalOrder(token);
-}
-
+  @Get('capture')
+  capture(@Req() req: any, @Query('token') token: string) {
+    return this.payments.capturePayPalOrder(req.user.id, token);
+  }
 }
