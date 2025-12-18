@@ -7,7 +7,8 @@ import * as paypal from '@paypal/checkout-server-sdk';
 @Injectable()
 export class PaymentsService {
   constructor(private prisma: PrismaService) {}
-async createPayPalOrder(userId: string, groupId: number) {
+
+  async createPayPalOrder(userId: string, groupId: number) {
   const existing = await this.prisma.payment.findFirst({
     where: { userId, groupId, status: 'CAPTURED' },
   });
