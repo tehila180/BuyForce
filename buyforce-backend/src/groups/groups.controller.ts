@@ -14,46 +14,54 @@ import { JwtAuthGuard } from '../auth/jwt.guard';
 export class GroupsController {
   constructor(private readonly groupsService: GroupsService) {}
 
-  // PUBLIC
+  // ✅ קבוצות פעילות לדף הבית (PUBLIC)
   @Get('featured')
   findFeatured() {
     return this.groupsService.findFeatured();
   }
 
-  // PUBLIC
+  // ✅ קבוצות פתוחות למוצר (PUBLIC)
   @Get('product/:productId')
   getGroupsForProduct(@Param('productId') productId: string) {
     return this.groupsService.findOpenForProduct(Number(productId));
   }
 
-  // LOGIN
+  // ✅ הקבוצות שלי (חייב להיות לפני :id)
   @UseGuards(JwtAuthGuard)
   @Get('my')
   getMyGroups(@Req() req: any) {
-    return this.groupsService.findMyGroups(req.user.userId);
+    const userId = req.user.userId;
+    return this.groupsService.findMyGroups(userId);
   }
 
-  // LOGIN
+  // ✅ יצירת קבוצה חדשה (LOGIN)
   @UseGuards(JwtAuthGuard)
   @Post()
-  createGroup(@Body('productId') productId: number, @Req() req: any) {
-    return this.groupsService.createGroup(
-      Number(productId),
-      req.user.userId,
-    );
+  createGroup(
+    @Body('productId') productId: number,
+    @Req() req: any,
+  ) {
+    const userId = req.user.userId;
+    return this.groupsService.createGroup(Number(productId), userId);
   }
 
-  // LOGIN
+  // ✅ הצטרפות לקבוצה (LOGIN)
   @UseGuards(JwtAuthGuard)
   @Post(':id/join')
   joinGroup(@Param('id') id: string, @Req() req: any) {
-    return this.groupsService.joinGroup(
-      Number(id),
-      req.user.userId,
-    );
+    const userId = req.user.userId;
+    return this.groupsService.joinGroup(Number(id), userId);
   }
 
-  // LOGIN
+  // ✅ תשלום לקבוצה (LOGIN)
+  @UseGuards(JwtAuthGuard)
+  @Post(':id/pay')
+  payGroup(@Param('id') id: string, @Req() req: any) {
+    const userId = req.user.userId;
+    return this.groupsService.payGroup(Number(id), userId);
+  }
+
+  // ✅ קבוצה אחת (LOGIN)
   @UseGuards(JwtAuthGuard)
   @Get(':id')
   getOne(@Param('id') id: string) {
