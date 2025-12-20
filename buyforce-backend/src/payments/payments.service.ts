@@ -1,68 +1,118 @@
+// src/payments/payments.service.ts
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { getPayPalClient } from './paypal.client';
+import * as paypal from '@paypal/checkout-server-sdk';
 
 @Injectable()
 export class PaymentsService {
   constructor(private prisma: PrismaService) {}
+async createPayPalOrder(userId: string, groupId: number) {
+  const existing = await this.prisma.payment.findFirst({
+    where: { userId, groupId, status: 'CAPTURED' },
+  });
 
-  async confirmPayment(
-    userId: string,
-    groupId: number,
-    paypalOrderId: string,
-  ) {
-    const existing = await this.prisma.payment.findFirst({
-      where: {
-        userId,
-        groupId,
-        status: 'CAPTURED',
-      },
-    });
-
-    if (existing) {
-      throw new BadRequestException('User already paid');
-    }
-
-    const group = await this.prisma.group.findUnique({
-      where: { id: groupId },
-      include: {
-        product: true,
-        members: true,
-        payments: true,
-      },
-    });
-
-    if (!group) {
-      throw new BadRequestException('Group not found');
-    }
-
-    const payment = await this.prisma.payment.create({
-      data: {
-        provider: 'PAYPAL',
-        status: 'CAPTURED',
-        userId,
-        groupId,
-        amount: group.product.priceGroup,
-        currency: 'ILS',
-        paypalOrderId,
-      },
-    });
-
-    const paidUsers = new Set(
-      [...group.payments, payment]
-        .filter(p => p.status === 'CAPTURED')
-        .map(p => p.userId),
-    );
-
-    if (paidUsers.size === group.members.length) {
-      await this.prisma.group.update({
-        where: { id: group.id },
-        data: {
-          status: 'paid',
-          paidAt: new Date(),
-        },
-      });
-    }
-
-    return { success: true };
+  if (existing) {
+    throw new BadRequestException('User already paid');
   }
+
+  const group = await this.prisma.group.findUnique({
+    where: { id: groupId },
+    include: { product: true },
+  });
+
+  if (!group) throw new Error('Group not found');
+
+  const amount = group.product.priceGroup;
+
+  const payment = await this.prisma.payment.create({
+    data: {
+      provider: 'PAYPAL',
+      userId,
+      groupId,
+      amount,
+      currency: 'ILS',
+      status: 'CREATED',
+    },
+  });
+
+  const client = getPayPalClient();
+  const request = new paypal.orders.OrdersCreateRequest();
+
+  request.requestBody({
+    intent: 'CAPTURE',
+    purchase_units: [
+      {
+        amount: {
+          currency_code: 'ILS',
+          value: amount.toFixed(2),
+        },
+      },
+    ],
+  });
+
+  const response = await client.execute(request);
+
+  await this.prisma.payment.update({
+    where: { id: payment.id },
+    data: { paypalOrderId: response.result.id },
+  });
+
+  return { orderId: response.result.id };
+
 }
+
+
+ async capturePayPalOrder(orderId: string) {
+  const payment = await this.prisma.payment.findUnique({
+    where: { paypalOrderId: orderId },
+  });
+
+  if (!payment) throw new Error('Payment not found');
+
+  const client = getPayPalClient();
+  const request = new paypal.orders.OrdersCaptureRequest(orderId);
+  await client.execute(request);
+
+  await this.prisma.payment.update({
+    where: { id: payment.id },
+    data: { status: 'CAPTURED' },
+  });
+
+  await this.checkAndCloseGroup(payment.groupId);
+}
+
+
+
+async checkAndCloseGroup(groupId: number) {
+  const group = await this.prisma.group.findUnique({
+    where: { id: groupId },
+    include: {
+      members: true,
+      payments: true,
+    },
+  });
+
+  if (!group) throw new Error('Group not found');
+
+  const paidUsers = new Set(
+  group.payments
+    .filter(p => p.status === 'CAPTURED')
+    .map(p => p.userId),
+);
+
+if (paidUsers.size === group.members.length) {
+  await this.prisma.group.update({
+    where: { id: group.id },
+    data: {
+      status: 'paid',
+      paidAt: new Date(),
+    },
+  });
+}
+
+}
+
+
+}
+
