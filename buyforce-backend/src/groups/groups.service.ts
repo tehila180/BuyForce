@@ -1,11 +1,11 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class GroupsService {
   constructor(private prisma: PrismaService) {}
 
-  // ✅ הקבוצות שלי + האם המשתמש שילם
+  // ✅ הקבוצות שלי + האם שילמתי
   async findMyGroups(userId: string) {
     const memberships = await this.prisma.groupMember.findMany({
       where: { userId },
@@ -40,11 +40,8 @@ export class GroupsService {
 
   // ✅ יצירת קבוצה
   async createGroup(productId: number, userId: string) {
-    return this.prisma.$transaction(async (tx) => {
-      const product = await tx.product.findUnique({
-        where: { id: productId },
-      });
-
+    return this.prisma.$transaction(async tx => {
+      const product = await tx.product.findUnique({ where: { id: productId } });
       if (!product) throw new NotFoundException('המוצר לא נמצא');
 
       const group = await tx.group.create({
@@ -59,9 +56,9 @@ export class GroupsService {
     });
   }
 
-  // ✅ הצטרפות לקבוצה + סגירה אוטומטית
+  // ✅ הצטרפות לקבוצה
   async joinGroup(groupId: number, userId: string) {
-    return this.prisma.$transaction(async (tx) => {
+    return this.prisma.$transaction(async tx => {
       await tx.groupMember.upsert({
         where: { groupId_userId: { groupId, userId } },
         update: {},
@@ -86,7 +83,7 @@ export class GroupsService {
     });
   }
 
-  // ✅ קבוצה אחת + האם המשתמש שילם
+  // ✅ קבוצה אחת + תשלומים
   async findOne(groupId: number, userId: string) {
     const group = await this.prisma.group.findUnique({
       where: { id: groupId },
@@ -107,6 +104,32 @@ export class GroupsService {
       ...group,
       hasPaid,
     };
+  }
+
+  // ✅ ביטול קבוצה + החזר תשלום
+  async cancelGroup(groupId: number) {
+    const group = await this.prisma.group.findUnique({
+      where: { id: groupId },
+      include: { payments: true },
+    });
+
+    if (!group) throw new NotFoundException('קבוצה לא נמצאה');
+
+    await this.prisma.group.update({
+      where: { id: groupId },
+      data: { status: 'cancelled' },
+    });
+
+    const paidPayments = group.payments.filter(p => p.status === 'CAPTURED');
+
+    for (const payment of paidPayments) {
+      await this.prisma.payment.update({
+        where: { id: payment.id },
+        data: { status: 'CREATED' },
+      });
+    }
+
+    return { success: true };
   }
 
   // ✅ קבוצות פעילות לדף הבית
