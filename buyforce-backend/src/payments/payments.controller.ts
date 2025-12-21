@@ -19,7 +19,7 @@ export class PaymentsController {
     @Body() body: { groupId: number; paypalOrderId: string },
   ) {
     return this.paymentsService.confirmPayment(
-      req.user.userId, // ✅ נכון
+      req.user.userId, // ✅ תיקון קריטי
       body.groupId,
       body.paypalOrderId,
     );
