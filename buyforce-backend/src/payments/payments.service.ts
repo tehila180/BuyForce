@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -10,6 +10,7 @@ export class PaymentsService {
     groupId: number,
     paypalOrderId: string,
   ) {
+    // 1️⃣ בדיקה: כבר שילם?
     const existing = await this.prisma.payment.findFirst({
       where: {
         userId,
@@ -22,6 +23,7 @@ export class PaymentsService {
       throw new BadRequestException('User already paid');
     }
 
+    // 2️⃣ קבוצה + חברים
     const group = await this.prisma.group.findUnique({
       where: { id: groupId },
       include: {
@@ -35,9 +37,16 @@ export class PaymentsService {
       throw new BadRequestException('Group not found');
     }
 
+    // 3️⃣ בדיקה: המשתמש חבר בקבוצה
+    const isMember = group.members.some(m => m.userId === userId);
+    if (!isMember) {
+      throw new ForbiddenException('User is not a member of this group');
+    }
+
+    // 4️⃣ יצירת תשלום
     const payment = await this.prisma.payment.create({
       data: {
-        provider: 'PAYPAL',
+        provider: 'PAYPAL', // ✅ עקבי
         status: 'CAPTURED',
         userId,
         groupId,
@@ -47,6 +56,7 @@ export class PaymentsService {
       },
     });
 
+    // 5️⃣ האם כולם שילמו?
     const paidUsers = new Set(
       [...group.payments, payment]
         .filter(p => p.status === 'CAPTURED')
