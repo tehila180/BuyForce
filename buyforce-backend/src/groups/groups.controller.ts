@@ -14,57 +14,37 @@ import { JwtAuthGuard } from '../auth/jwt.guard';
 export class GroupsController {
   constructor(private readonly groupsService: GroupsService) {}
 
-  // ✅ קבוצות פעילות לדף הבית (PUBLIC)
+  // PUBLIC
   @Get('featured')
   findFeatured() {
     return this.groupsService.findFeatured();
   }
 
-  // ✅ קבוצות פתוחות למוצר (PUBLIC)
-  @Get('product/:productId')
-  getGroupsForProduct(@Param('productId') productId: string) {
-    return this.groupsService.findOpenForProduct(Number(productId));
-  }
-
-  // ✅ הקבוצות שלי (חייב להיות לפני :id)
+  // MY GROUPS
   @UseGuards(JwtAuthGuard)
   @Get('my')
   getMyGroups(@Req() req: any) {
-    const userId = req.user.userId;
-    return this.groupsService.findMyGroups(userId);
+    return this.groupsService.findMyGroups(req.user.userId);
   }
 
-  // ✅ יצירת קבוצה חדשה (LOGIN)
+  // CREATE
   @UseGuards(JwtAuthGuard)
   @Post()
-  createGroup(
-    @Body('productId') productId: number,
-    @Req() req: any,
-  ) {
-    const userId = req.user.userId;
-    return this.groupsService.createGroup(Number(productId), userId);
+  createGroup(@Body('productId') productId: number, @Req() req: any) {
+    return this.groupsService.createGroup(productId, req.user.userId);
   }
 
-  // ✅ הצטרפות לקבוצה (LOGIN)
+  // JOIN
   @UseGuards(JwtAuthGuard)
   @Post(':id/join')
   joinGroup(@Param('id') id: string, @Req() req: any) {
-    const userId = req.user.userId;
-    return this.groupsService.joinGroup(Number(id), userId);
+    return this.groupsService.joinGroup(Number(id), req.user.userId);
   }
 
-  // ✅ תשלום לקבוצה (LOGIN)
-  @UseGuards(JwtAuthGuard)
-  @Post(':id/pay')
-  payGroup(@Param('id') id: string, @Req() req: any) {
-    const userId = req.user.userId;
-    return this.groupsService.payGroup(Number(id), userId);
-  }
-
-  // ✅ קבוצה אחת (LOGIN)
+  // ONE GROUP
   @UseGuards(JwtAuthGuard)
   @Get(':id')
-  getOne(@Param('id') id: string) {
-    return this.groupsService.findOne(Number(id));
+  getOne(@Param('id') id: string, @Req() req: any) {
+    return this.groupsService.findOne(Number(id), req.user.userId);
   }
 }
