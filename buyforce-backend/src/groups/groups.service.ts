@@ -140,17 +140,5 @@ export class GroupsService {
       orderBy: { createdAt: 'desc' },
     });
   }
-  // קבוצות פתוחות למוצר
-async findOpenForProduct(productId: number) {
-  return this.prisma.group.findMany({
-    where: {
-      productId,
-      status: 'open',
-    },
-    include: {
-      members: true,
-    },
-  });
-}
-
+  
 }
